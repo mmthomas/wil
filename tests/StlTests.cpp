@@ -279,4 +279,51 @@ TEST_CASE("StlTests::TestZWStringView", "[stl][zstring_view]")
     REQUIRE(wil::zwstring_view(fake_path) == L"hello");
 }
 
+TEST_CASE("StlTests::TestZStringView substr and contains", "[stl][zstring_view]")
+{
+    const auto test = [](auto value, auto expectedTail, auto prefix, auto missing, auto presentChar, auto missingChar) {
+        using zstring_view_type = decltype(value);
+        using char_type = typename zstring_view_type::value_type;
+        using string_view_type = std::basic_string_view<char_type>;
+
+        STATIC_REQUIRE(std::is_same_v<decltype(value.substr()), zstring_view_type>);
+        STATIC_REQUIRE(std::is_same_v<decltype(value.substr(0, 1)), string_view_type>);
+
+        const auto tail = value.substr(7);
+        REQUIRE(tail == expectedTail);
+        REQUIRE(tail.c_str()[tail.size()] == char_type{});
+
+        const auto whole = value.substr();
+        REQUIRE(whole == value);
+        REQUIRE(whole.data() == value.data());
+
+        const auto end = value.substr(value.size());
+        REQUIRE(end.empty());
+        REQUIRE(end.data() == value.data() + value.size());
+        REQUIRE(end.c_str()[0] == char_type{});
+
+        const auto slice = value.substr(0, 5);
+        REQUIRE(slice == prefix);
+
+        REQUIRE(value.contains(prefix));
+        REQUIRE(!value.contains(missing));
+        REQUIRE(value.contains(presentChar));
+        REQUIRE(!value.contains(missingChar));
+        REQUIRE(value.contains(value));
+
+        zstring_view_type empty;
+        const auto emptyTail = empty.substr();
+        REQUIRE(emptyTail.empty());
+        REQUIRE(emptyTail.data() == nullptr);
+        REQUIRE(empty.contains(string_view_type{}));
+        REQUIRE(!empty.contains(presentChar));
+
+        REQUIRE_THROWS_AS(value.substr(value.size() + 1), std::out_of_range);
+        REQUIRE_THROWS_AS(value.substr(value.size() + 1, 1), std::out_of_range);
+    };
+
+    test(wil::zstring_view{"Hello, World!"}, wil::zstring_view{"World!"}, "Hello", "missing", 'W', 'x');
+    test(wil::zwstring_view{L"Hello, World!"}, wil::zwstring_view{L"World!"}, L"Hello", L"missing", L'W', L'x');
+}
+
 #endif

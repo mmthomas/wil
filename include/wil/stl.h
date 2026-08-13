@@ -166,6 +166,9 @@ inline wil::unique_bstr make_bstr(std::wstring_view source)
     * A zstring_view can be converted implicitly to a std::string_view because it is always safe to use a nul-terminated
       string_view as a plain string view.
     * A zstring_view can be constructed from a std::string because the data in std::string is nul-terminated.
+    * substr(pos) returns a zstring_view because the tail remains nul-terminated. substr(pos, count) returns a
+      std::string_view because an arbitrary slice may not be nul-terminated.
+    * contains() is available before C++23 through a compatibility implementation.
 */
 template <class TChar>
 class basic_zstring_view : public std::basic_string_view<TChar>
@@ -245,6 +248,36 @@ public:
     {
         WI_ASSERT(this->data() == nullptr || this->data()[this->size()] == 0);
         return this->data();
+    }
+
+    // contains() backport for builds below C++23. Compiles out once the STL provides
+    // basic_string_view::contains natively.
+#if !defined(__cpp_lib_string_contains) || __cpp_lib_string_contains < 202011L
+    WI_NODISCARD constexpr bool contains(std::basic_string_view<TChar> view) const noexcept
+    {
+        return this->find(view) != this->npos;
+    }
+
+    WI_NODISCARD constexpr bool contains(TChar value) const noexcept
+    {
+        return this->find(value) != this->npos;
+    }
+
+    WI_NODISCARD constexpr bool contains(const TChar* value) const
+    {
+        return this->find(value) != this->npos;
+    }
+#endif
+
+    WI_NODISCARD constexpr basic_zstring_view substr(size_type pos = 0) const
+    {
+        const auto tail = std::basic_string_view<TChar>(*this).substr(pos);
+        return tail.data() == nullptr ? basic_zstring_view{} : basic_zstring_view{tail.data(), tail.size()};
+    }
+
+    WI_NODISCARD constexpr std::basic_string_view<TChar> substr(size_type pos, size_type count) const
+    {
+        return std::basic_string_view<TChar>(*this).substr(pos, count);
     }
 
 private:
