@@ -184,21 +184,18 @@ struct nonnull_zstring_view_traits
 
 namespace details
 {
-    template <typename TChar, typename Traits>
+    template <typename TChar, typename Traits, typename = void>
     struct zstring_view_traits
     {
-        template <typename T = Traits>
-        static std::bool_constant<T::empty_strings_are_non_null> deduce_empty_strings_are_non_null(int);
-        template <typename = Traits>
-        static std::false_type deduce_empty_strings_are_non_null(...);
+        static constexpr bool empty_strings_are_non_null = false;
+        using char_traits = Traits;
+    };
 
-        template <typename T = Traits>
-        static typename T::char_traits deduce_char_traits(int);
-        template <typename T = Traits>
-        static T deduce_char_traits(...);
-
-        static constexpr bool empty_strings_are_non_null = decltype(deduce_empty_strings_are_non_null(0))::value;
-        using char_traits = decltype(deduce_char_traits(0));
+    template <typename TChar, typename Traits>
+    struct zstring_view_traits<TChar, Traits, std::void_t<decltype(Traits::empty_strings_are_non_null)>>
+    {
+        static constexpr bool empty_strings_are_non_null = Traits::empty_strings_are_non_null;
+        using char_traits = typename Traits::char_traits;
     };
 
     template <typename T>
@@ -233,6 +230,9 @@ class basic_zstring_view : public std::basic_string_view<TChar, typename details
     using ZStringViewTraits = details::zstring_view_traits<TChar, Traits>;
     using BaseType = std::basic_string_view<TChar, typename ZStringViewTraits::char_traits>;
     using size_type = typename BaseType::size_type;
+
+    template <class, class>
+    friend class basic_zstring_view;
 
     template <typename T>
     struct has_c_str
@@ -319,8 +319,7 @@ public:
     template <
         typename OtherTraits,
         std::enable_if_t<
-            !std::is_same_v<Traits, OtherTraits> &&
-                std::is_same_v<typename ZStringViewTraits::char_traits, typename details::zstring_view_traits<TChar, OtherTraits>::char_traits> &&
+            !std::is_same_v<Traits, OtherTraits> && std::is_same_v<BaseType, typename basic_zstring_view<TChar, OtherTraits>::BaseType> &&
                 (!ZStringViewTraits::empty_strings_are_non_null || details::zstring_view_traits<TChar, OtherTraits>::empty_strings_are_non_null),
             int> = 0>
     constexpr basic_zstring_view(const basic_zstring_view<TChar, OtherTraits>& other) noexcept :
@@ -331,14 +330,18 @@ public:
     template <
         typename OtherTraits,
         std::enable_if_t<
-            !std::is_same_v<Traits, OtherTraits> &&
-                std::is_same_v<typename ZStringViewTraits::char_traits, typename details::zstring_view_traits<TChar, OtherTraits>::char_traits> &&
+            !std::is_same_v<Traits, OtherTraits> && std::is_same_v<BaseType, typename basic_zstring_view<TChar, OtherTraits>::BaseType> &&
                 ZStringViewTraits::empty_strings_are_non_null && !details::zstring_view_traits<TChar, OtherTraits>::empty_strings_are_non_null,
             long> = 0>
     explicit constexpr basic_zstring_view(const basic_zstring_view<TChar, OtherTraits>& other) noexcept :
         BaseType(require_non_null(other.data()), other.size())
     {
     }
+
+    template <
+        typename OtherTraits,
+        std::enable_if_t<!std::is_same_v<Traits, OtherTraits> && !std::is_same_v<BaseType, typename basic_zstring_view<TChar, OtherTraits>::BaseType>, short> = 0>
+    basic_zstring_view(const basic_zstring_view<TChar, OtherTraits>&) = delete;
 
     // basic_string_view [] precondition won't let us read view[view.size()]; so we define our own.
     WI_NODISCARD constexpr const TChar& operator[](size_type idx) const noexcept
@@ -351,7 +354,7 @@ public:
     {
         if constexpr (ZStringViewTraits::empty_strings_are_non_null)
         {
-            WI_STL_FAIL_FAST_IF_NULL(this->data());
+            WI_ASSERT(this->data() != nullptr);
         }
         WI_ASSERT(this->data() == nullptr || this->data()[this->size()] == 0);
         return this->data();

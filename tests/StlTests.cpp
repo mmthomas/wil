@@ -369,11 +369,6 @@ TEST_CASE("StlTests::TestNonNullZStringView", "[stl][zstring_view][nonnull]")
         REQUIRE(baseReference.data() == fromLiteral.data());
         REQUIRE(baseReference.size() == fromLiteral.size());
 
-        nonnull_type corrupted{text};
-        string_view_type& mutableBaseReference = corrupted;
-        mutableBaseReference = string_view_type{};
-        REQUIRE_ERROR(corrupted.c_str());
-
         nullable_type nullable = fromLiteral;
         REQUIRE(nullable.data() == fromLiteral.data());
         REQUIRE(nullable.size() == fromLiteral.size());
@@ -399,7 +394,13 @@ TEST_CASE("StlTests::TestNonNullZStringView", "[stl][zstring_view][nonnull]")
     {
     };
     using custom_nonnull = wil::basic_zstring_view<char, wil::nonnull_zstring_view_traits<char, custom_char_traits>>;
+    using custom_nullable = wil::basic_zstring_view<char, custom_char_traits>;
+    using custom_base = std::basic_string_view<char, typename wil::details::zstring_view_traits<char, custom_char_traits>::char_traits>;
     STATIC_REQUIRE(std::is_base_of_v<std::basic_string_view<char, custom_char_traits>, custom_nonnull>);
+    STATIC_REQUIRE(!std::is_same_v<std::string_view, custom_base>);
+    STATIC_REQUIRE(!std::is_constructible_v<wil::zstring_view, custom_nullable>);
+    STATIC_REQUIRE(!std::is_constructible_v<custom_nonnull, wil::zstring_view>);
+    STATIC_REQUIRE(!std::is_constructible_v<wil::nonnull_zstring_view, custom_nullable>);
 }
 
 #endif
