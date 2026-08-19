@@ -27,6 +27,9 @@
 #ifndef WI_STL_FAIL_FAST_IF
 #define WI_STL_FAIL_FAST_IF FAIL_FAST_IF
 #endif
+#ifndef WI_STL_FAIL_FAST_IF_NULL
+#define WI_STL_FAIL_FAST_IF_NULL FAIL_FAST_IF_NULL
+#endif
 /// @endcond
 
 #if defined(WIL_ENABLE_EXCEPTIONS)
@@ -348,7 +351,7 @@ public:
     {
         if constexpr (ZStringViewTraits::empty_strings_are_non_null)
         {
-            WI_STL_FAIL_FAST_IF(this->data() == nullptr);
+            WI_STL_FAIL_FAST_IF_NULL(this->data());
         }
         WI_ASSERT(this->data() == nullptr || this->data()[this->size()] == 0);
         return this->data();
@@ -401,9 +404,9 @@ private:
     {
         if constexpr (ZStringViewTraits::empty_strings_are_non_null)
         {
+            value = WI_STL_FAIL_FAST_IF_NULL(value);
             if (value == nullptr)
             {
-                WI_STL_FAIL_FAST_IF(true);
                 return &details::zstring_view_empty_storage<TChar>[0];
             }
         }
