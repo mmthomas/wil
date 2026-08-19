@@ -369,6 +369,11 @@ TEST_CASE("StlTests::TestNonNullZStringView", "[stl][zstring_view][nonnull]")
         REQUIRE(baseReference.data() == fromLiteral.data());
         REQUIRE(baseReference.size() == fromLiteral.size());
 
+        nonnull_type corrupted{text};
+        string_view_type& mutableBaseReference = corrupted;
+        mutableBaseReference = string_view_type{};
+        REQUIRE_ERROR(corrupted.c_str());
+
         nullable_type nullable = fromLiteral;
         REQUIRE(nullable.data() == fromLiteral.data());
         REQUIRE(nullable.size() == fromLiteral.size());

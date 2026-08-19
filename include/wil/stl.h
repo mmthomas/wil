@@ -346,6 +346,10 @@ public:
 
     WI_NODISCARD constexpr const TChar* c_str() const noexcept
     {
+        if constexpr (ZStringViewTraits::empty_strings_are_non_null)
+        {
+            WI_STL_FAIL_FAST_IF(this->data() == nullptr);
+        }
         WI_ASSERT(this->data() == nullptr || this->data()[this->size()] == 0);
         return this->data();
     }
