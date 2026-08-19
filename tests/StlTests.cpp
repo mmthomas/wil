@@ -201,6 +201,20 @@ TEST_CASE("StlTests::TestZStringView formatting", "[stl][zstring_view]")
         auto fmtStr = std::format("Hello {}", str);
         REQUIRE(fmtStr == "Hello kittens");
     }
+
+    SECTION("nonnull_zstring_view can be used with std::format")
+    {
+        wil::nonnull_zstring_view str{"kittens"};
+        auto fmtStr = std::format("Hello {}", str);
+        REQUIRE(fmtStr == "Hello kittens");
+    }
+
+    SECTION("nonnull_zwstring_view can be used with std::format")
+    {
+        wil::nonnull_zwstring_view str{L"kittens"};
+        auto fmtStr = std::format(L"Hello {}", str);
+        REQUIRE(fmtStr == L"Hello kittens");
+    }
 }
 
 #endif
@@ -324,6 +338,63 @@ TEST_CASE("StlTests::TestZStringView substr and contains", "[stl][zstring_view]"
 
     test(wil::zstring_view{"Hello, World!"}, wil::zstring_view{"World!"}, "Hello", "missing", 'W', 'x');
     test(wil::zwstring_view{L"Hello, World!"}, wil::zwstring_view{L"World!"}, L"Hello", L"missing", L'W', L'x');
+}
+
+TEST_CASE("StlTests::TestNonNullZStringView", "[stl][zstring_view][nonnull]")
+{
+    const auto test = [](auto nonnullDefault, auto nullableDefault, auto text) {
+        using nonnull_type = decltype(nonnullDefault);
+        using nullable_type = decltype(nullableDefault);
+        using char_type = typename nonnull_type::value_type;
+        using string_view_type = std::basic_string_view<char_type>;
+
+        STATIC_REQUIRE(sizeof(nonnull_type) == sizeof(nullable_type));
+        STATIC_REQUIRE(std::is_trivially_copyable_v<nonnull_type>);
+        STATIC_REQUIRE(!std::is_constructible_v<nonnull_type, std::nullptr_t>);
+        STATIC_REQUIRE(std::is_convertible_v<nonnull_type, nullable_type>);
+        STATIC_REQUIRE(!std::is_convertible_v<nullable_type, nonnull_type>);
+        STATIC_REQUIRE(std::is_constructible_v<nonnull_type, nullable_type>);
+
+        REQUIRE(nullableDefault.data() == nullptr);
+        REQUIRE(nonnullDefault.data() != nullptr);
+        REQUIRE(nonnullDefault.empty());
+        REQUIRE(nonnullDefault.c_str()[0] == char_type{});
+
+        nonnull_type fromLiteral{text};
+        REQUIRE(fromLiteral.data() != nullptr);
+        REQUIRE(fromLiteral.c_str()[fromLiteral.size()] == char_type{});
+        REQUIRE(wil::str_raw_ptr(fromLiteral) == fromLiteral.c_str());
+
+        string_view_type& baseReference = fromLiteral;
+        REQUIRE(baseReference.data() == fromLiteral.data());
+        REQUIRE(baseReference.size() == fromLiteral.size());
+
+        nullable_type nullable = fromLiteral;
+        REQUIRE(nullable.data() == fromLiteral.data());
+        REQUIRE(nullable.size() == fromLiteral.size());
+
+        nonnull_type checked{nullable};
+        REQUIRE(checked.data() == nullable.data());
+        REQUIRE(checked.size() == nullable.size());
+
+        auto emptyTail = nonnullDefault.substr();
+        REQUIRE(emptyTail.data() != nullptr);
+        REQUIRE(emptyTail.empty());
+
+        const char_type* nullPointer = nullptr;
+        REQUIRE_ERROR((nonnull_type{nullPointer}));
+        REQUIRE_ERROR((nonnull_type{nullPointer, 0}));
+        REQUIRE_ERROR((nonnull_type{nullableDefault}));
+    };
+
+    test(wil::nonnull_zstring_view{}, wil::zstring_view{}, "hello");
+    test(wil::nonnull_zwstring_view{}, wil::zwstring_view{}, L"hello");
+
+    struct custom_char_traits : std::char_traits<char>
+    {
+    };
+    using custom_nonnull = wil::basic_zstring_view<char, wil::nonnull_zstring_view_traits<char, custom_char_traits>>;
+    STATIC_REQUIRE(std::is_base_of_v<std::basic_string_view<char, custom_char_traits>, custom_nonnull>);
 }
 
 #endif
